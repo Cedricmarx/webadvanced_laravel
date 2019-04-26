@@ -3,100 +3,112 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Http\Requests;
 use App\Http\Controllers\Controller;
 use App\Task;
+use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Display index
      *
      * @return \Illuminate\Http\Response
      */
     public function index()
     {
-        // hier krijgt ge uw index terug en gaat die het sorteren op desc dus de laaste toegevoegde taak eerst en stuurt hij een lijst terug naar de view. (ga naar welcome.blade.php)
-        $tasks = Task::orderBy('created_at','desc')->get(); // laatste task is de eerste
-        return view('welcome')->with('tasks',$tasks);
+        $tasks = Task::orderBy('created_at', 'desc')->take(5)->get();
+        $categories = Task::distinct()->get('category');
+        return view('welcome')->with(['tasks' => $tasks, 'categories' => $categories]);
     }
 
     /**
-     * Show the form for creating a new resource.
-     *
+     * Display overview
+     * 
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
-        //
+    public function overview() {
+        $tasks = Task::orderBy('created_at', 'desc')->get();
+        $categories = Task::distinct()->get('category');
+        return view('overview')->with(['tasks' => $tasks, 'categories' => $categories]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Search category
+     * 
+     * @return \Illuminate\Http\Response
+     */
+    public function searchCategory($category) {
+        $tasks = Task::orderBy('created_at', 'desc')->where('category', '=', $category)->get();
+        $categories = Task::distinct()->get('category');
+        return view('searchCategory')->with(['category' => $category, 'tasks' => $tasks, 'categories' => $categories]);
+    }
+
+    /**
+     * Store a newly created task in storage
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
     {
-        //hier wordt de task megegeven en wordt een nieuw objTask aangemaakt en wordt de note ingestoken.
-        $task = $request['task'];
+        $validator = Validator::make($request->all(), [
+            'note' => 'required',
+            'category' => 'required',
+            'due' => 'required'
+        ]);
 
-        $objTask = new Task();
-        $objTask->note = $task;
-        $objTask->save();
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()->all()]);
+        }
 
-        return redirect() -> back(); // geeft dezelfde website terug
+        $task = new Task();
+        $task->note = $request->get('note');
+        $task->category = $request->get('category');
+        $task->date = now();
+        $task->dueDate = $request->get('due');
+        $task->save();
 
+        return response()->json(['success' => 'Data successfully added']);
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
+     * Remove the specified task from storage.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
     public function destroy($id)
     {
-        // het verwijderen van tasks
-        $task = Task::where('id',$id)->first(); // kijken welke id gelijk is aan welke task
+        $task = Task::where('id', $id)->first();
+        $task->delete();
+        return redirect()->back();
+    }
 
-        $task->delete(); // task uit de database verwijderd
+    /**
+     * Complete the specified task 
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function complete($id)
+    {
+        $task = Task::where('id', $id)->first();
+        $task->complete = true;
+        $task->save();
+        return redirect()->back();
+    }
 
-        return redirect() -> back(); // refreshen van de pagina
+    /**
+     * Mark specified task as incomplete
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function incomplete($id)
+    {
+        $task = Task::where('id', $id)->first();
+        $task->complete = false;
+        $task->save();
+        return redirect()->back();
     }
 }
